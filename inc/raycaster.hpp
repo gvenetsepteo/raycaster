@@ -57,9 +57,6 @@ struct Camera {
   double x;
 };
 
-
-
-
 struct Map {
   int def[mapWidth][mapHeight];
   int x;
@@ -106,7 +103,6 @@ struct Map {
   }
 };
 
-
 struct Ray {
   double rayDirX;
   double rayDirY;
@@ -148,7 +144,6 @@ struct Ray {
   }
 };
 
-
 struct DDA {
   int hit;
   int side;
@@ -157,6 +152,7 @@ struct DDA {
   DDA() { hit = 0; }
 
   void performDDA(Ray &r, Map &map) {
+    hit = 0;
     while (hit == 0) {
       // jump to next map square, either in x-direction, or in y-direction
       if (r.sideDistX < r.sideDistY) {
@@ -188,7 +184,7 @@ struct Wall {
   int drawEnd;
   double wallX;  // where exactly the wall was hit
 
-  Wall() { pitch = 100; }
+  Wall() {}
 
   void calculateWallX(Points &p, DDA &d, Ray &r) {
     // calculate value of wallX
@@ -199,12 +195,9 @@ struct Wall {
     wallX -= floor((wallX));
   }
 
-  void calculateWallHeight(DDA &d) {
-    // calculate height of line to draw on screen
+  void calculateWallDraws(DDA &d) {
     lineHeight = (int)(QuickCG::h / d.perpWallDist);
-  }
-
-  void calculateWallDraws() {
+    pitch = 100;
     // calculate lowest and highest pixel to fill in current stripe
     drawStart = -lineHeight / 2 + QuickCG::h / 2 + pitch;
     if (drawStart < 0) drawStart = 0;
@@ -212,7 +205,6 @@ struct Wall {
     if (drawEnd >= QuickCG::h) drawEnd = QuickCG::h - 1;
   }
 };
-
 
 struct Texture {
   std::vector<Uint32> texture[8];
@@ -265,38 +257,34 @@ struct Texture {
     }
   }
 
-  void calcTexture(Wall &w, Ray &r, DDA &d, Buffer &b, int index) {
-      // x coordinate on the texture
-      tX = int(w.wallX * double(texWidth));
-      if (d.side == 0 && r.rayDirX > 0) tX = texWidth - tX - 1;
-      if (d.side == 1 && r.rayDirY < 0) tX = texWidth - tX - 1;
-
-            // coordinate per screen pixel
-      step = 1.0 * texHeight / w.lineHeight;
-      // Starting texture coordinate
-      tPos =
-          (w.drawStart - w.pitch - QuickCG::h / 2 + w.lineHeight / 2) * step;
-      for (int y = w.drawStart; y < w.drawEnd; y++) {
-        // Cast the texture coordinate to integer, and mask with (texHeight - 1)
-        // in case of overflow
-        tY = (int)tPos & (texHeight - 1);
-        tPos += step;
-        Uint32 color = texture[texNum][texHeight * tY + tX];
-        // make color darker for y-sides: R, G and B byte each divided through
-        // two with a "shift" and an "and"
-        if (d.side == 1) color = (color >> 1) & 8355711;
-        b.buffer[y][index] = color;
-      }
-  }
-
-  void calcTexturing(Map &map) {
+  void calcTexture(Wall &w, Ray &r, DDA &d, Buffer &b, int index, Map &map) {
     // texturing calculations
     texNum = map.def[map.x][map.y] - 1;
     // 1 subtracted from it so that texture 0 can be used!
+
+    // x coordinate on the texture
+    tX = int(w.wallX * double(texWidth));
+    if (d.side == 0 && r.rayDirX > 0) tX = texWidth - tX - 1;
+    if (d.side == 1 && r.rayDirY < 0) tX = texWidth - tX - 1;
+
+    // coordinate per screen pixel
+    step = 1.0 * texHeight / w.lineHeight;
+    // Starting texture coordinate
+    tPos = (w.drawStart - w.pitch - QuickCG::h / 2 + w.lineHeight / 2) * step;
+    for (int y = w.drawStart; y < w.drawEnd; y++) {
+      // Cast the texture coordinate to integer, and mask with (texHeight - 1)
+      // in case of overflow
+      tY = (int)tPos & (texHeight - 1);
+      tPos += step;
+      Uint32 color = texture[texNum][texHeight * tY + tX];
+      // make color darker for y-sides: R, G and B byte each divided through
+      // two with a "shift" and an "and"
+      if (d.side == 1) color = (color >> 1) & 8355711;
+      b.buffer[y][index] = color;
+    }
   }
+
 };
-
-
 
 struct Hooks {
   int hooks(Map &map, Points &p, Speed &s) {
@@ -370,6 +358,7 @@ struct Frame {
           1000.0;  // frametime is the time this frame has taken, in seconds
     }
     QuickCG::print(int(1.0 / frameTime));  // FPS counter
+    QuickCG::redraw();
   }
 
   void speedModifier(Speed &s) {
@@ -377,8 +366,6 @@ struct Frame {
     s.rotSpeed = frameTime * 3.0;   // the constant value is in radians/second
   }
 };
-
-
 
 }  // namespace RC
 #endif
